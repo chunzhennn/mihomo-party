@@ -79,6 +79,22 @@ export async function mihomoGroupDelay(group: string, url?: string): Promise<IMi
   return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('mihomoGroupDelay', group, url))
 }
 
+export async function mihomoSmartGroupWeights(groupName: string): Promise<Record<string, number>> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('mihomoSmartGroupWeights', groupName))
+}
+
+export async function mihomoSmartFlushCache(configName?: string): Promise<void> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('mihomoSmartFlushCache', configName))
+}
+
+export async function showDetailedError(title: string, message: string): Promise<void> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('showDetailedError', title, message))
+}
+
+export async function getSmartOverrideContent(): Promise<string | null> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('getSmartOverrideContent'))
+}
+
 export async function patchMihomoConfig(patch: Partial<IMihomoConfig>): Promise<void> {
   return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('patchMihomoConfig', patch))
 }
@@ -147,6 +163,10 @@ export async function updateProfileItem(item: IProfileItem): Promise<void> {
   return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('updateProfileItem', item))
 }
 
+export async function addProfileUpdater(item: IProfileItem): Promise<void> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('addProfileUpdater', item))
+}
+
 export async function getProfileStr(id: string): Promise<string> {
   return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('getProfileStr', id))
 }
@@ -207,8 +227,38 @@ export async function triggerSysProxy(enable: boolean): Promise<void> {
   return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('triggerSysProxy', enable))
 }
 
+
+
+export async function checkTunPermissions(): Promise<boolean> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('checkTunPermissions'))
+}
+
+export async function grantTunPermissions(): Promise<void> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('grantTunPermissions'))
+}
+
 export async function manualGrantCorePermition(): Promise<void> {
   return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('manualGrantCorePermition'))
+}
+
+export async function checkHighPrivilegeCore(): Promise<boolean> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('checkHighPrivilegeCore'))
+}
+
+export async function checkAdminPrivileges(): Promise<boolean> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('checkAdminPrivileges'))
+}
+
+export async function restartAsAdmin(): Promise<void> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('restartAsAdmin'))
+}
+
+export async function showTunPermissionDialog(): Promise<boolean> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('showTunPermissionDialog'))
+}
+
+export async function showErrorDialog(title: string, message: string): Promise<void> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('showErrorDialog', title, message))
 }
 
 export async function getFilePath(ext: string[]): Promise<string[] | undefined> {

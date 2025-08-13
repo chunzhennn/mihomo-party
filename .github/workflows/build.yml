@@ -12,7 +12,41 @@ on:
 permissions: write-all
 
 jobs:
+  cleanup-dev-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete Dev Release Assets
+        if: github.event_name == 'workflow_dispatch'
+        continue-on-error: true
+        run: |
+          # Get release ID for dev tag
+          RELEASE_ID=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/dev" | \
+            jq -r '.id // empty')
+
+          if [ ! -z "$RELEASE_ID" ]; then
+            echo "Found dev release with ID: $RELEASE_ID"
+
+            # Get all assets and delete them
+            curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID/assets" | \
+              jq -r '.[].id' | \
+              while read asset_id; do
+                echo "Deleting asset: $asset_id"
+                curl -X DELETE -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                  "https://api.github.com/repos/${{ github.repository }}/releases/assets/$asset_id"
+              done
+
+            echo "All dev release assets deleted"
+          else
+            echo "No existing dev release found"
+          fi
+      - name: Skip for Tag Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: echo "Skipping cleanup for tag release"
   windows:
+    needs: [cleanup-dev-release]
+    if: always() && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
     strategy:
       fail-fast: false
       matrix:
@@ -65,10 +99,24 @@ jobs:
             dist/*.sha256
             dist/*setup.exe
             dist/*portable.7z
-          body_path: changelog.md
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish Dev Release
+        if: github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: dev
+          files: |
+            dist/*.sha256
+            dist/*setup.exe
+            dist/*portable.7z
+          body: "Development build from ${{ github.sha }}"
+          prerelease: true
+          draft: false
           token: ${{ secrets.GITHUB_TOKEN }}
 
   windows7:
+    needs: [cleanup-dev-release]
+    if: always() && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
     strategy:
       fail-fast: false
       matrix:
@@ -122,10 +170,24 @@ jobs:
             dist/*.sha256
             dist/*setup.exe
             dist/*portable.7z
-          body_path: changelog.md
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish Dev Release
+        if: github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: dev
+          files: |
+            dist/*.sha256
+            dist/*setup.exe
+            dist/*portable.7z
+          body: "Development build from ${{ github.sha }}"
+          prerelease: true
+          draft: false
           token: ${{ secrets.GITHUB_TOKEN }}
 
   linux:
+    needs: [cleanup-dev-release]
+    if: always() && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
     strategy:
       fail-fast: false
       matrix:
@@ -172,10 +234,24 @@ jobs:
             dist/*.sha256
             dist/*.deb
             dist/*.rpm
-          body_path: changelog.md
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish Dev Release
+        if: github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: dev
+          files: |
+            dist/*.sha256
+            dist/*.deb
+            dist/*.rpm
+          body: "Development build from ${{ github.sha }}"
+          prerelease: true
+          draft: false
           token: ${{ secrets.GITHUB_TOKEN }}
 
   macos:
+    needs: [cleanup-dev-release]
+    if: always() && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
     strategy:
       fail-fast: false
       matrix:
@@ -206,7 +282,7 @@ jobs:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
         run: |
-          chmod +x build/pkg-scripts/postinstall
+          chmod +x build/pkg-scripts/postinstall build/pkg-scripts/preinstall
           pnpm build:mac --${{ matrix.arch }}
       - name: Setup temporary installer signing keychain
         uses: apple-actions/import-codesign-certs@v3
@@ -245,10 +321,23 @@ jobs:
           files: |
             dist/*.sha256
             dist/*.pkg
-          body_path: changelog.md
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish Dev Release
+        if: github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: dev
+          files: |
+            dist/*.sha256
+            dist/*.pkg
+          body: "Development build from ${{ github.sha }}"
+          prerelease: true
+          draft: false
           token: ${{ secrets.GITHUB_TOKEN }}
 
   macos10:
+    needs: [cleanup-dev-release]
+    if: always() && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
     strategy:
       fail-fast: false
       matrix:
@@ -281,7 +370,7 @@ jobs:
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
         run: |
           sed -i "" -e "s/macos/catalina/" electron-builder.yml
-          chmod +x build/pkg-scripts/postinstall
+          chmod +x build/pkg-scripts/postinstall build/pkg-scripts/preinstall
           pnpm build:mac --${{ matrix.arch }}
       - name: Setup temporary installer signing keychain
         uses: apple-actions/import-codesign-certs@v3
@@ -320,12 +409,23 @@ jobs:
           files: |
             dist/*.sha256
             dist/*.pkg
-          body_path: changelog.md
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish Dev Release
+        if: github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: dev
+          files: |
+            dist/*.sha256
+            dist/*.pkg
+          body: "Development build from ${{ github.sha }}"
+          prerelease: true
+          draft: false
           token: ${{ secrets.GITHUB_TOKEN }}
 
   updater:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: [windows, macos, windows7, macos10]
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    needs: [windows, windows7, linux, macos, macos10]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -335,16 +435,28 @@ jobs:
       - name: Install Dependencies
         run: pnpm install
       - name: Telegram Notification
+        if: startsWith(github.ref, 'refs/tags/v')
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: pnpm telegram
       - name: Generate latest.yml
         run: pnpm updater
       - name: Publish Release
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: latest.yml
           body_path: changelog.md
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish Dev Release
+        if: github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: dev
+          files: latest.yml
+          body: "Development build updater from ${{ github.sha }}"
+          prerelease: true
+          draft: false
           token: ${{ secrets.GITHUB_TOKEN }}
 
   aur-release-updater:

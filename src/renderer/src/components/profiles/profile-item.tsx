@@ -14,7 +14,7 @@ import {
 import { calcPercent, calcTraffic } from '@renderer/utils/calc'
 import { IoMdMore, IoMdRefresh } from 'react-icons/io'
 import dayjs from '@renderer/utils/dayjs'
-import React, { Key, useEffect, useMemo, useState } from 'react'
+import React, { Key, useMemo, useState } from 'react'
 import EditFileModal from './edit-file-modal'
 import EditInfoModal from './edit-info-modal'
 import { useSortable } from '@dnd-kit/sortable'
@@ -60,6 +60,7 @@ const ProfileItem: React.FC<Props> = (props) => {
   const [selecting, setSelecting] = useState(false)
   const [openInfoEditor, setOpenInfoEditor] = useState(false)
   const [openFileEditor, setOpenFileEditor] = useState(false)
+  const [dropdownOpen, setDropdownOpen] = useState(false)
   const {
     attributes,
     listeners,
@@ -71,7 +72,8 @@ const ProfileItem: React.FC<Props> = (props) => {
     id: info.id
   })
   const transform = tf ? { x: tf.x, y: tf.y, scaleX: 1, scaleY: 1 } : null
-  const [disableSelect, setDisableSelect] = useState(false)
+  const [isActuallyDragging, setIsActuallyDragging] = useState(false)
+  const [clickStartPos, setClickStartPos] = useState<{ x: number; y: number } | null>(null)
 
   const menuItems: MenuItem[] = useMemo(() => {
     const list = [
@@ -143,17 +145,52 @@ const ProfileItem: React.FC<Props> = (props) => {
     }
   }
 
-  useEffect(() => {
-    if (isDragging) {
-      setTimeout(() => {
-        setDisableSelect(true)
-      }, 200)
-    } else {
-      setTimeout(() => {
-        setDisableSelect(false)
-      }, 200)
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDropdownOpen(true)
+  }
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button === 0) {
+      setClickStartPos({ x: e.clientX, y: e.clientY })
+      setIsActuallyDragging(false)
     }
-  }, [isDragging])
+  }
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!clickStartPos) return
+
+    const dx = e.clientX - clickStartPos.x
+    const dy = e.clientY - clickStartPos.y
+    if (dx * dx + dy * dy > 25) {
+      setIsActuallyDragging(true)
+    }
+  }
+
+  const handleMouseUp = (e: React.MouseEvent) => {
+    const cleanup = () => {
+      setClickStartPos(null)
+      setTimeout(() => setIsActuallyDragging(false), 100)
+    }
+
+    // 只处理左键点击
+    if (e.button !== 0) return cleanup()
+
+    // 检查功能按钮点击
+    const target = e.target as Element
+    if (target?.closest('button, [role="menu"], [role="menuitem"], [data-slot="trigger"]')) {
+      return cleanup()
+    }
+
+    // 处理卡片选中
+    if (!isActuallyDragging && !isDragging && clickStartPos) {
+      setSelecting(true)
+      onPress().finally(() => setSelecting(false))
+    }
+
+    cleanup()
+  }
 
   return (
     <div
@@ -173,20 +210,23 @@ const ProfileItem: React.FC<Props> = (props) => {
           updateProfileItem={updateProfileItem}
         />
       )}
+      
       <Card
         as="div"
         fullWidth
-        isPressable
-        onPress={() => {
-          if (disableSelect) return
-          setSelecting(true)
-          onPress().finally(() => {
-            setSelecting(false)
-          })
-        }}
-        className={`${isCurrent ? 'bg-primary' : ''} ${selecting ? 'blur-sm' : ''}`}
+        isPressable={false}
+        onContextMenu={handleContextMenu}
+        className={`${isCurrent ? 'bg-primary' : ''} ${selecting ? 'blur-sm' : ''} cursor-pointer`}
       >
-        <div ref={setNodeRef} {...attributes} {...listeners} className="w-full h-full">
+        <div
+          ref={setNodeRef}
+          {...attributes}
+          {...listeners}
+          className="w-full h-full"
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+        >
           <CardBody className="pb-1">
             <div className="flex justify-between h-[32px]">
               <h3
@@ -218,9 +258,17 @@ const ProfileItem: React.FC<Props> = (props) => {
                   </Tooltip>
                 )}
 
-                <Dropdown>
+                <Dropdown
+                  isOpen={dropdownOpen}
+                  onOpenChange={setDropdownOpen}
+                >
                   <DropdownTrigger>
-                    <Button isIconOnly size="sm" variant="light" color="default">
+                    <Button
+                      isIconOnly
+                      size="sm"
+                      variant="light"
+                      color="default"
+                    >
                       <IoMdMore
                         color="default"
                         className={`text-[24px] ${isCurrent ? 'text-primary-foreground' : 'text-foreground'}`}
